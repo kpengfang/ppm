@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+		<style>
+			*{
+				padding:0;
+				margin:0;
+				list-style: none;
+			}
+			#box{
+				width:600px;
+				height:500px;
+				margin:0 auto;
+				border:3px solid black;
+				position: relative;
+			}
+			
+			#restart{
+				font:bold 24px/24px "微软雅黑";
+				color:white;
+				padding:8px 15px;
+				border:3px solid white;
+				background: coral;
+				width:100px;
+				border-radius: 10px;
+				position: absolute;
+				top:80%;
+				left:50%;
+				transform: translateX(-50%);	
+				cursor: pointer;
+				display: none;
+			}
+			#restart:hover{
+				background: chocolate;
+			}
+		</style>
+		<script>
+			window.onload = function(){
+				var zm = new Zm();
+				zm.draw();
+			}
+			function Zm(){
+				this.outBox = document.getElementById("box");
+				this.cavBox = document.getElementById("cav");
+				this.audios = document.getElementsByTagName('audio');
+				this.cav = this.cavBox.getContext('2d');
+				this.timer = null;
+				this.ball = [];//目标球
+				this.iRotate = 0;//鼠标在画布移动时，求出的怪兽头部偏转弧度
+				this.bullet = [];//子弹数组
+				this.score = 0;
+				//1，绘制游戏路径
+				this.draw =  function(){
+					var This = this;
+					//创建一个新目标球
+					this.createBall();
+					
+					this.changeMonster();
+					this.createBullet();
+
+					this.timer = setInterval(function(){
+						//清空画布
+						This.cav.clearRect(0,0,600,500);
+						//绘制路径
+						This.drawPath();
+						
+						
+						//画目标球
+						This.drawBall();
+						//画中心吐球怪兽
+						This.drawMonster();
+						//画子弹
+						This.changeBullet();
+						//判断是否击中目标
+						This.onHit();
+						//改变每一个球的位置
+						var re = This.changePos();
+						if(re){
+							This.gameOver();
+						}
+						
+					},30);
+					
+				}
+				//绘制路径
+				this.drawPath = function(){
+					this.cav.save();
+					this.cav.beginPath();
+					this.cav.arc(300,200,200,-90*Math.PI/180,180*Math.PI/180);
+					this.cav.stroke();
+					this.cav.beginPath();
+					this.cav.arc(250,200,150,0*Math.PI/180,180*Math.PI/180,true);
+					this.cav.stroke();
+					this.cav.beginPath();
+					this.cav.arc(400,200,20,0,2*Math.PI);
+					this.cav.stroke();
+					this.cav.restore();
+				}
+				//创建小球
+				this.createBall = function(){
+					var This = this;
+					setInterval(function(){
+						This.ball.push({
+							x:300,
+							y:0,
+							startX:300,
+							startY:0,
+							arc:0,
+							r:200
+						})
+					},500);
+					
+				}
+				//改变每一个球的位置
+				this.changePos = function(){
+					for(var i=0;i<this.ball.length;i++){
+						this.ball[i].arc++;
+						this.ball[i].x = this.ball[i].startX + this.ball[i].r*Math.sin(this.ball[i].arc*Math.PI/180);
+						this.ball[i].y = this.ball[i].startY + this.ball[i].r-this.ball[i].r*Math.cos(this.ball[i].arc*Math.PI/180);
+						//如果转了270度改变球的半径和起始位置
+						if(this.ball[i].arc==270){
+							this.ball[i].r = 150;
+							this.ball[i].startX = 250;
+							this.ball[i].startY = 50;
+						}
+						//判断死亡
+						if(this.ball[i].arc==270+180){
+							clearInterval(this.timer);
+							return true;
+						}
+					}
+					return false;
+				}
+				//画目标球
+				this.drawBall = function(){
+					for(var i=0;i<this.ball.length;i++){
+						this.cav.beginPath();
+						this.cav.arc(this.ball[i].x,this.ball[i].y,20,0,2*Math.PI);
+						this.cav.fill();
+						
+					}
+				}
+				//画怪兽
+				this.drawMonster = function(){
+					var img = new Image();
+					img.src = 'person.png';
+					this.cav.save();
+					this.cav.beginPath();
+					this.cav.translate(300,200);
+					this.cav.rotate(this.iRotate);
+					this.cav.translate(-40,-40);
+					this.cav.drawImage(img,0,0);
+					this.cav.restore();
+				}
+				//鼠标在屏幕移动，调转怪兽头的方向
+				this.changeMonster = function(){
+					var This = this;
+					this.cavBox.onmousemove = function(ev){
+
+						var ev = ev || event;
+						var x = ev.clientX - This.outBox.offsetLeft;
+						var y = ev.clientY - This.outBox.offsetTop;
+						var a = x - 300;
+						var b = y-200;
+						var c = Math.sqrt(a*a+b*b);
+						if(a>0&&b>0){
+							This.iRotate = Math.asin(b/c)+90*Math.PI/180;
+						}else if(a>0){
+							This.iRotate = Math.asin(a/c);
+						}else if(a<0&&b<0){
+							This.iRotate = 360*Math.PI/180 - Math.asin(-a/c);
+						}else{
+							This.iRotate = 270*Math.PI/180 - Math.asin(b/c);
+						}
+
+					}
+				}
+//				创建新子弹
+				this.createBullet = function(){
+					var This = this;
+					this.cavBox.onmousedown = function(ev){
+						var ev = ev || event;
+						var x = ev.clientX - This.outBox.offsetLeft;
+						var y = ev.clientY - This.outBox.offsetTop;
+						var a = x - 300;
+						var b = y-200;
+						var c = Math.sqrt(a*a+b*b);
+						var speed = 5;
+						var sx = a/c * speed;
+						var sy = b/c * speed;
+						This.bullet.push({
+							x:300,
+							y:200,
+							sx:sx,
+							sy:sy
+						})
+					}
+					
+				}
+				//改变子弹位置
+				this.changeBullet = function(){
+					
+					for(var i=0;i<this.bullet.length;i++){
+						
+						this.bullet[i].x = this.bullet[i].x + this.bullet[i].sx;
+						this.bullet[i].y = this.bullet[i].y + this.bullet[i].sy;
+						this.cav.save();
+						this.cav.beginPath();
+						this.cav.fillStyle = 'red';
+						this.cav.arc(this.bullet[i].x,this.bullet[i].y,20,0,360*Math.PI/180);
+						this.cav.fill();
+						this.cav.restore();
+					}
+				}
+				//打中目标球
+				this.hit = function(x1,y1,x2,y2){
+					var a = x1 - x2;
+					var b = y1 - y2;
+					var c = Math.sqrt(a*a+b*b);
+					if(c<40){
+						this.score++;
+						return true;
+					}else{
+						return false;
+					}
+				}
+				this.onHit = function(){
+					for(var i=0;i<this.bullet.length;i++){
+						for(var j=0;j<this.ball.length;j++){
+
+							if(this.hit(this.bullet[i].x,this.bullet[i].y,this.ball[j].x,this.ball[j].y)){
+								this.bullet.splice(i,1);
+								this.ball.splice(j,1);
+								break;
+							}
+						}
+					}
+				}
+				
+				this.gameOver = function(){
+					this.cav.clearRect(0,0,600,500);
+					this.cav.beginPath();
+					this.cav.fillStyle = 'coral';
+					this.cav.fillRect(0,0,600,500);
+					this.cav.fill();
+					this.cav.beginPath();
+					this.cav.font = '40px 微软雅黑';
+					this.cav.textAlign = 'center';
+					this.cav.fillStyle = 'black';
+					this.cav.fillText('游戏结束',this.cavBox.width/2,this.cavBox.height/2);
+					this.cav.beginPath();
+					this.cav.font = '30px 微软雅黑';
+					this.cav.textAlign = 'center';
+					this.cav.fillStyle = 'blue';
+					this.cav.fillText('总得分:' + this.score+'分',this.cavBox.width/2,2*this.cavBox.height/3);
+					var restart = document.getElementById('restart');
+					restart.style.display = 'inline';
+					//重新开始
+					restart.onclick = function(){
+						window.location.reload();
+					}
+				}
+			}
+		</script>
+	</head>
+	<body>
+		<div id="box">
+			<canvas id="cav"  width="600" height="500">
+				
+			</canvas>
+			<span id="restart">重新开始</span>
+		</div>
+		
+		<audio src="a4.ogg" ></audio>
+		<audio src="b4.ogg" ></audio>
+	</body>
+</html>
